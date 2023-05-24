@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState} from 'react';
 import {api} from '../utils/Api.js';
 import {CurrentUserContext} from '../contexts/CurrentUserContext.js';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useHistory } from 'react-router-dom';
+//import { Link, useNavigate } from 'react-router-dom';
+import * as apiAuth from '../utils/apiAuth.js';
 import Header from './Header.js';
 import Main from './Main.js';
 import Footer from './Footer.js';
@@ -14,6 +16,7 @@ import Register from './Register.js';
 import InfoTooltip from './InfoTooltip.js';
 import imageRegister from '../images/Register.png';
 import imageNoRegister from '../images/NoRegister.png';
+import ProtectedRoute from './ProtectedRoute.js';
 
 function App() {
   const [isEditProfilePopupOpen, setIsEditProfilePopupOpen] = React.useState(false);
@@ -23,8 +26,10 @@ function App() {
   const [cards, setCards] = React.useState([]);
   const [currentUser, setСurrentUser] = React.useState({});
   const [isInfoTooltip, setIsInfoTooltip] = React.useState(false);
+  const [isInfoTooltipError, setIsInfoTooltipError] = React.useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [userData, setUserData] = useState({ email: '' });
   
-
 
 //загрузка профиля и аватара с сервера
 React.useEffect(() => {
@@ -139,13 +144,88 @@ React.useEffect(() => {
     setIsInfoTooltip(true);
   }
 
+  function handleInfoTooltipError () {
+    setIsInfoTooltipError(true);
+  }
+
   //закрытие всех попапов
   function closeAllPopups () {
     setIsEditAvatarPopupOpen(false);
     setIsEditProfilePopupOpen(false);
     setIsAddPlacePopupOpen(false);
     setIsInfoTooltip(false);
+    setIsInfoTooltipError(false);
     setSelectedCard(null);
+  }
+
+  const handleLogin = ({email}) => {
+    setLoggedIn(true);
+    setUserData({email})
+  }
+
+  const navigate = useNavigate();
+
+  //регистрация
+  function handleRegister (email, password) {
+      apiAuth.register(email, password)
+      .then(() => {
+        handleInfoTooltip();
+        navigate('/sign-in', {replace: true});
+      })
+      .catch((err) => {
+        handleInfoTooltipError();
+        console.log(err);
+      })
+  }
+
+
+  //авторизация
+  function handleAuthorize (email, password) {
+    apiAuth.authorize(email, password)
+    .then((data) => {
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        handleLogin({email});
+        navigate('/mesto-react', {replace: true});
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+    })
+}
+
+//проверка валидности токена
+  function handleTokenCheck() {
+  const token = localStorage.getItem('token');
+  if (token){
+    apiAuth.checkToken(token)
+    .then((user) => {
+      handleLogin(user)
+      navigate('/mesto-react', {replace: true})
+      })
+    .catch((err) => {
+      console.log(err);
+    })  
+  }
+}
+
+  React.useEffect(() => {
+    handleTokenCheck();
+  }, [])
+
+  //const history = useHistory();
+
+  function signOut(){
+    localStorage.removeItem('token');
+    navigate('/sign-up', {replace: true})
+  }
+
+  function signIn(){
+    navigate('/sign-in', {replace: true})
+  }
+
+  function signUp(){
+    navigate('/sign-up', {replace: true})
   }
 
   return (
@@ -154,26 +234,38 @@ React.useEffect(() => {
         <div className="page__container">
 
         <Routes>
-            <Route index element={<>
+            <Route path="/" element={loggedIn ? <Navigate to='/mesto-react'/> : <Navigate to='/sign-up' replace />} />
+       
+            {/* <Route index element={<>
               <Header 
-             headerEmail={''} headerTitle={'Регистрация'} headerLink={'/sign-in'}/>
-             <Login />
-             </>} />
+             headerEmail={''} headerTitle={'Вход'} headerLink={'/sign-in'} signOut={signOut}/>
+             <Register onRegister={handleRegister} />
+             </>} /> */}
+
             <Route path="/sign-up" element={<>
-            <Header headerEmail={''} headerTitle={'Регистрация'} headerLink={'/sign-in'}/>
-             <Login />
+            <Header email={''} headerTitle={'Войти'} headerLink={'/sign-in'} signOut={signIn}/>
+            <Register onRegister={handleRegister} />
              </>} />
+
+
             <Route path='/sign-in' element={
             <>
-            <Header headerEmail={''} headerTitle={'Вход'} headerLink={'/sign-up'}/>
-            <Register onsetIsInfoTooltip={handleInfoTooltip} />
+            <Header email={''} headerTitle={'Регистрация'} headerLink={'/sign-up'} signOut={signUp}/>
+            <Login onLogin={handleAuthorize}/>
             </>
             }/>
+
+
+
             <Route path='/mesto-react' element={
-              <>
-            <Header 
-            headerEmail={'123'} headerTitle={'Выйти'} headerLink={''}/>
-            <Main 
+            <>
+            <ProtectedRoute element={Header} loggedIn={loggedIn} userData={userData}
+              email={handleLogin}
+              headerTitle={'Выйти'}
+              headerLink={''}
+              signOut={signOut} /> 
+            
+            <ProtectedRoute element={Main} loggedIn={loggedIn} userData={userData}
               onEditAvatar={handleEditAvatarClick}
               onEditProfile={handleEditProfileClick}
               onAddPlace={handleAddPlaceClick}
@@ -181,18 +273,19 @@ React.useEffect(() => {
               cards={cards}
               onCardDelete={handleCardDelete}
               onCardLike={handleCardLike}
-              onCardDislike={handleCardDislike}
-            />
-            </>}/>
+              onCardDislike={handleCardDislike}/> 
+            </>
+            }/>
+
         </Routes>
-             <Footer />    
+        <Footer />    
         </div> 
 
         <ImagePopup onClose={closeAllPopups} card={selectedCard} />
 
         <InfoTooltip name="register" title="Вы успешно зарегистрировались!" image={imageRegister} isOpen={isInfoTooltip} onClose={closeAllPopups} />
 
-        <InfoTooltip name="noregister" title="Что-то пошло не так! Попробуйте ещё раз." image={imageNoRegister} isOpen={isInfoTooltip} onClose={closeAllPopups} />
+        <InfoTooltip name="error" title="Что-то пошло не так! Попробуйте ещё раз." image={imageNoRegister} isOpen={isInfoTooltipError} onClose={closeAllPopups} />
 
         <EditProfilePopup isOpen={isEditProfilePopupOpen} onClose={closeAllPopups} onUpdateUser={handleUpdateUser} />
 
