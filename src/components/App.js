@@ -222,7 +222,7 @@ function App() {
       apiAuth
         .checkToken(token)
         .then((user) => {
-          handleLogin(user);
+          handleLogin(user.data);
           navigate("/mesto-react", { replace: true });
         })
         .catch((err) => {
