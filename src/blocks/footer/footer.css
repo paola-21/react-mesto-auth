@@ -1,5 +1,6 @@
 .footer {
   padding: 66px 762px 56px 200px;
+  background: black;
 }
 
 @media (max-width: 1279px) {

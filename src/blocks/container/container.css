@@ -1,6 +1,7 @@
 .container {
   padding-left: 200px;
-  padding-right: 200px;  
+  padding-right: 200px;
+  background: black;
 }
 
 @media (max-width: 1279px) {
