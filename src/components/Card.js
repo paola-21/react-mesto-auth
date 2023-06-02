@@ -20,7 +20,7 @@ export default function Card({
   }`;
 
   function handleClick() {
-    onCardClick(card); 
+    onCardClick(card);
   }
 
   function handleDeleteClick() {
